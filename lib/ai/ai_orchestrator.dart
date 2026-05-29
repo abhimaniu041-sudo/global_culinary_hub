@@ -1,8 +1,8 @@
+import 'dart:convert';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../models/ai_provider_model.dart';
 import '../models/recipe_model.dart';
 import '../cache/local_cache.dart';
-import '../utils/constants.dart';
 import 'provider_health_monitor.dart';
 import 'providers/gemini_provider.dart';
 import 'providers/openai_provider.dart';
@@ -71,8 +71,7 @@ class AiOrchestrator {
         providers.sort((a, b) {
           final healthA = healthMonitor.getProvider(a);
           final healthB = healthMonitor.getProvider(b);
-          return healthA.averageLatencyMs
-              .compareTo(healthB.averageLatencyMs);
+          return healthA.averageLatencyMs.compareTo(healthB.averageLatencyMs);
         });
         order = providers;
         break;
@@ -93,25 +92,23 @@ class AiOrchestrator {
     if (cached != null) return cached;
 
     final providers = _getProviderOrder();
-    String? result;
     Exception? lastException;
 
     for (final providerName in providers) {
       try {
         final stopwatch = Stopwatch()..start();
-        result = await _callProvider(providerName, prompt);
+        final result = await _callProvider(providerName, prompt);
         stopwatch.stop();
 
-        _ref
-            .read(providerHealthMonitorProvider)
-            .recordSuccess(providerName, stopwatch.elapsedMilliseconds.toDouble());
+        _ref.read(providerHealthMonitorProvider).recordSuccess(
+            providerName, stopwatch.elapsedMilliseconds.toDouble());
 
-        if (result != null) {
+        if (result != null && result.isNotEmpty) {
           await cache.set(cacheKey, result);
           return result;
         }
       } catch (e) {
-        lastException = e as Exception?;
+        lastException = Exception(e.toString());
         _ref
             .read(providerHealthMonitorProvider)
             .recordFailure(providerName, e.toString());
@@ -122,14 +119,14 @@ class AiOrchestrator {
     throw lastException ?? Exception('All AI providers failed');
   }
 
-  Future<RecipeModel?> generateRecipe(
-      String query, {String language = 'en'}) async {
+  Future<RecipeModel?> generateRecipe(String query,
+      {String language = 'en'}) async {
     final prompt = _buildRecipePrompt(query, language);
-    final jsonString = await generateText(prompt);
     try {
+      final jsonString = await generateText(prompt);
       final cleanJson = _extractJson(jsonString);
-      final json = _parseJson(cleanJson);
-      return RecipeModel.fromJson(json);
+      final map = jsonDecode(cleanJson) as Map<String, dynamic>;
+      return RecipeModel.fromJson(map);
     } catch (e) {
       return null;
     }
@@ -156,11 +153,8 @@ class AiOrchestrator {
   }
 
   String _buildRecipePrompt(String query, String language) {
-    return '''
-You are an expert global culinary chef. Generate a complete, authentic recipe for: "$query"
-
+    return '''You are an expert global culinary chef. Generate a complete, authentic recipe for: "$query"
 Language preference: $language
-
 Respond ONLY with valid JSON in this exact format:
 {
   "recipe_id": "unique_id_here",
@@ -168,21 +162,13 @@ Respond ONLY with valid JSON in this exact format:
   "cuisine": "cuisine type",
   "history": "brief history of this dish",
   "ingredients": ["ingredient 1", "ingredient 2"],
-  "instructions": ["Step 1: ...", "Step 2: ...", "Step 3: ..."],
+  "instructions": ["Step 1: ...", "Step 2: ..."],
   "prep_time": "30 minutes",
   "difficulty": "Easy",
   "servings": "4 people",
-  "suggested_substitutions": ["substitute 1", "substitute 2"],
-  "nutrition": {
-    "calories": "350 kcal",
-    "protein": "25g",
-    "carbs": "40g",
-    "fat": "10g"
-  }
-}
-
-Provide authentic, detailed, accurate information. No additional text outside the JSON.
-''';
+  "suggested_substitutions": ["substitute 1"],
+  "nutrition": {"calories": "350 kcal","protein": "25g","carbs": "40g","fat": "10g"}
+}''';
   }
 
   String _extractJson(String text) {
@@ -192,23 +178,5 @@ Provide authentic, detailed, accurate information. No additional text outside th
       return text.substring(start, end + 1);
     }
     return text;
-  }
-
-  Map<String, dynamic> _parseJson(String jsonString) {
-    // Simple JSON parsing using dart:convert
-    // ignore: avoid_dynamic_calls
-    return Map<String, dynamic>.from(
-        _jsonDecode(jsonString) as Map<dynamic, dynamic>);
-  }
-
-  dynamic _jsonDecode(String source) {
-    // Uses dart:convert internally
-    return _dartConvertJsonDecode(source);
-  }
-
-  // ignore: non_constant_identifier_names
-  dynamic _dartConvertJsonDecode(String source) {
-    // This will be replaced at runtime with actual dart:convert
-    throw UnimplementedError('Use dart:convert');
   }
 }
