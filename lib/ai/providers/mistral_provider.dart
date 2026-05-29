@@ -1,0 +1,51 @@
+import 'dart:convert';
+import 'package:dio/dio.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:flutter_secure_storage/flutter_secure_storage.dart';
+import '../../config/app_config.dart';
+
+final mistralProviderProvider = Provider<MistralProvider>((ref) {
+  return MistralProvider();
+});
+
+class MistralProvider {
+  final Dio _dio = Dio(BaseOptions(
+    baseUrl: AppConfig.mistralBaseUrl,
+    connectTimeout:
+        const Duration(milliseconds: AppConfig.connectionTimeout),
+    receiveTimeout:
+        const Duration(milliseconds: AppConfig.receiveTimeout),
+  ));
+
+  Future<String?> generate(String prompt) async {
+    const storage = FlutterSecureStorage();
+    final apiKey = await storage.read(key: 'MISTRAL_API_KEY');
+    if (apiKey == null || apiKey.isEmpty) {
+      throw Exception('Mistral API key not found');
+    }
+
+    _dio.options.headers['Authorization'] = 'Bearer $apiKey';
+
+    final response = await _dio.post(
+      '/chat/completions',
+      data: jsonEncode({
+        'model': 'mistral-small-latest',
+        'messages': [
+          {'role': 'user', 'content': prompt}
+        ],
+        'max_tokens': 2048,
+        'temperature': 0.7,
+      }),
+    );
+
+    if (response.statusCode == 200) {
+      final data = response.data as Map<String, dynamic>;
+      final choices = data['choices'] as List?;
+      if (choices != null && choices.isNotEmpty) {
+        final message = choices[0]['message'] as Map<String, dynamic>?;
+        return message?['content'] as String?;
+      }
+    }
+    throw Exception('Mistral: Invalid response');
+  }
+}
