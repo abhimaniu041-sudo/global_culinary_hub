@@ -13,7 +13,6 @@ import '../screens/favorites/favorites_screen.dart';
 import '../screens/history/history_screen.dart';
 import '../screens/chat/ai_chat_screen.dart';
 import '../screens/dashboard/monitoring_dashboard.dart';
-import '../screens/cuisine/cuisine_dishes_screen.dart';
 import '../providers/auth_provider.dart';
 
 final appRouterProvider = Provider<GoRouter>((ref) {
@@ -91,12 +90,131 @@ final appRouterProvider = Provider<GoRouter>((ref) {
           ),
           GoRoute(
             path: '/cuisine/:name',
-            builder: (context, state) => CuisineDishesScreen(
-              cuisineName: state.pathParameters['name'] ?? '',
-            ),
+            builder: (context, state) {
+              final name = state.pathParameters['name'] ?? '';
+              return _CuisineSearchScreen(cuisineName: name);
+            },
           ),
         ],
       ),
     ],
   );
 });
+
+class _CuisineSearchScreen extends ConsumerWidget {
+  final String cuisineName;
+  const _CuisineSearchScreen({required this.cuisineName});
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    return Scaffold(
+      appBar: AppBar(title: Text('$cuisineName Cuisine')),
+      body: Padding(
+        padding: const EdgeInsets.all(16),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            Text(
+              'Popular $cuisineName Dishes',
+              style: Theme.of(context)
+                  .textTheme
+                  .headlineSmall
+                  ?.copyWith(fontWeight: FontWeight.bold),
+            ),
+            const SizedBox(height: 8),
+            Text(
+              'Tap any dish to generate its complete recipe with AI',
+              style: const TextStyle(color: Colors.grey),
+            ),
+            const SizedBox(height: 20),
+            Expanded(
+              child: _CuisineDishList(cuisineName: cuisineName),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+final _dishListProvider =
+    FutureProvider.family<List<String>, String>((ref, cuisine) async {
+  final orchestrator = ref.read(
+      Provider((r) => r.read(
+          Provider((r2) => null))));
+  return _getDefaultDishes(cuisine);
+});
+
+List<String> _getDefaultDishes(String cuisine) {
+  final dishes = {
+    'Italian': ['Pizza Margherita', 'Pasta Carbonara', 'Lasagna', 'Risotto', 'Tiramisu', 'Osso Buco', 'Bruschetta', 'Minestrone', 'Gnocchi', 'Panna Cotta', 'Arancini', 'Cannoli'],
+    'Indian': ['Butter Chicken', 'Biryani', 'Dal Makhani', 'Palak Paneer', 'Chole Bhature', 'Samosa', 'Naan', 'Tandoori Chicken', 'Gulab Jamun', 'Dosa', 'Pav Bhaji', 'Rogan Josh'],
+    'Mexican': ['Tacos', 'Enchiladas', 'Guacamole', 'Tamales', 'Chiles Rellenos', 'Pozole', 'Mole Poblano', 'Quesadilla', 'Burrito', 'Churros', 'Elote', 'Horchata'],
+    'Japanese': ['Sushi', 'Ramen', 'Tempura', 'Tonkatsu', 'Miso Soup', 'Yakitori', 'Gyoza', 'Udon', 'Takoyaki', 'Matcha Ice Cream', 'Onigiri', 'Teriyaki'],
+    'Chinese': ['Kung Pao Chicken', 'Dim Sum', 'Peking Duck', 'Fried Rice', 'Hot Pot', 'Mapo Tofu', 'Spring Rolls', 'Wonton Soup', 'Char Siu', 'Xiaolongbao', 'Congee', 'Chow Mein'],
+    'French': ['Croissant', 'Coq au Vin', 'Ratatouille', 'Bouillabaisse', 'Crème Brûlée', 'Quiche Lorraine', 'Escargot', 'Soufflé', 'Beef Bourguignon', 'Crepes', 'French Onion Soup', 'Macarons'],
+    'Thai': ['Pad Thai', 'Tom Yum', 'Green Curry', 'Som Tum', 'Massaman Curry', 'Khao Pad', 'Mango Sticky Rice', 'Tom Kha Gai', 'Larb', 'Pad See Ew', 'Thai Spring Rolls', 'Satay'],
+    'American': ['Burger', 'BBQ Ribs', 'Mac and Cheese', 'Clam Chowder', 'Buffalo Wings', 'Apple Pie', 'Pancakes', 'Lobster Roll', 'Cheesesteak', 'Gumbo', 'Cornbread', 'Key Lime Pie'],
+  };
+  return dishes[cuisine] ?? List.generate(12, (i) => '$cuisine Dish ${i + 1}');
+}
+
+class _CuisineDishList extends ConsumerWidget {
+  final String cuisineName;
+  const _CuisineDishList({required this.cuisineName});
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final dishes = _getDefaultDishes(cuisineName);
+    final colorScheme = Theme.of(context).colorScheme;
+
+    return ListView.builder(
+      itemCount: dishes.length,
+      itemBuilder: (context, index) {
+        final dish = dishes[index];
+        return Card(
+          margin: const EdgeInsets.only(bottom: 10),
+          child: ListTile(
+            leading: Container(
+              width: 36,
+              height: 36,
+              decoration: BoxDecoration(
+                color: colorScheme.primaryContainer,
+                borderRadius: BorderRadius.circular(8),
+              ),
+              child: Center(
+                child: Text(
+                  '${index + 1}',
+                  style: TextStyle(
+                    fontWeight: FontWeight.bold,
+                    color: colorScheme.primary,
+                  ),
+                ),
+              ),
+            ),
+            title: Text(
+              dish,
+              style: const TextStyle(fontWeight: FontWeight.w600),
+            ),
+            subtitle: Text(
+              '$cuisineName cuisine',
+              style: const TextStyle(fontSize: 12),
+            ),
+            trailing: ElevatedButton.icon(
+              onPressed: () => context.go(
+                  '/generate?q=${Uri.encodeComponent(dish)}'),
+              icon: const Icon(Icons.auto_awesome, size: 14),
+              label: const Text('Recipe', style: TextStyle(fontSize: 12)),
+              style: ElevatedButton.styleFrom(
+                padding: const EdgeInsets.symmetric(
+                    horizontal: 10, vertical: 6),
+              ),
+            ),
+            onTap: () => context.go(
+                '/generate?q=${Uri.encodeComponent(dish)}'),
+          ),
+        );
+      },
+    );
+  }
+}
