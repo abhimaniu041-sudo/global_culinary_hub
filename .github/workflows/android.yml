@@ -54,8 +54,17 @@ jobs:
       - name: Run Tests
         run: flutter test
 
+      - name: Setup Android SDK
+        run: |
+          echo "ANDROID_SDK_ROOT=$ANDROID_SDK_ROOT" >> $GITHUB_ENV
+          yes | sdkmanager --licenses || true
+
       - name: Build Release APK
-        run: flutter build apk --release --no-tree-shake-icons
+        run: |
+          cd android
+          chmod +x gradlew
+          cd ..
+          flutter build apk --release --no-tree-shake-icons
 
       - name: Build Release AAB
         run: flutter build appbundle --release --no-tree-shake-icons
