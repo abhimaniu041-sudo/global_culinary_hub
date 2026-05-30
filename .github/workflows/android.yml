@@ -54,39 +54,26 @@ jobs:
       - name: Run Tests
         run: flutter test
 
-      - name: Fix Gradle Wrapper Properties
+      - name: Overwrite Gradle Wrapper Version
         run: |
-          mkdir -p android/gradle/wrapper
-          cat > android/gradle/wrapper/gradle-wrapper.properties << 'GRADLEEOF'
+          cat > android/gradle/wrapper/gradle-wrapper.properties << 'EOF'
           distributionBase=GRADLE_USER_HOME
           distributionPath=wrapper/dists
-          distributionUrl=https\://services.gradle.org/distributions/gradle-8.3-all.zip
+          distributionUrl=https\://services.gradle.org/distributions/gradle-8.7-all.zip
           zipStoreBase=GRADLE_USER_HOME
           zipStorePath=wrapper/dists
-          GRADLEEOF
-
-      - name: Fix Gradlew Permissions
-        run: |
-          git update-index --chmod=+x android/gradlew || true
-          chmod 755 android/gradlew || true
-          ls -la android/gradlew || echo "gradlew not found"
-
-      - name: Recreate Gradlew If Missing
-        run: |
-          if [ ! -f android/gradlew ]; then
-            cd android
-            gradle wrapper --gradle-version 8.3 || true
-            cd ..
-          fi
-          chmod 755 android/gradlew || true
+          EOF
+          echo "Contents of gradle-wrapper.properties:"
+          cat android/gradle/wrapper/gradle-wrapper.properties
+          chmod +x android/gradlew
 
       - name: Accept Android Licenses
         run: yes | sdkmanager --licenses || true
 
       - name: Build Release APK
         run: |
-          export GRADLE_OPTS="-Dorg.gradle.daemon=false"
-          flutter build apk --release --no-tree-shake-icons --verbose
+          export GRADLE_OPTS="-Dorg.gradle.daemon=false -Dorg.gradle.jvmargs=-Xmx4g"
+          flutter build apk --release --no-tree-shake-icons
 
       - name: Build Release AAB
         run: flutter build appbundle --release --no-tree-shake-icons
