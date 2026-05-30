@@ -1,7 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
-import '../../auth/auth_service.dart';
 import '../../providers/auth_provider.dart';
 import '../../utils/validators.dart';
 
@@ -29,12 +28,7 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
 
   Future<void> _signIn() async {
     if (!_formKey.currentState!.validate()) return;
-
-    setState(() {
-      _isLoading = true;
-      _errorMessage = null;
-    });
-
+    setState(() { _isLoading = true; _errorMessage = null; });
     try {
       final authService = ref.read(authServiceProvider);
       await authService.signInWithEmail(
@@ -43,28 +37,20 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
       );
       if (mounted) context.go('/home');
     } catch (e) {
-      setState(() {
-        _errorMessage = 'Invalid email or password. Please try again.';
-      });
+      setState(() { _errorMessage = 'Invalid email or password. Please try again.'; });
     } finally {
       if (mounted) setState(() => _isLoading = false);
     }
   }
 
   Future<void> _signInWithGoogle() async {
-    setState(() {
-      _isLoading = true;
-      _errorMessage = null;
-    });
-
+    setState(() { _isLoading = true; _errorMessage = null; });
     try {
       final authService = ref.read(authServiceProvider);
       final result = await authService.signInWithGoogle();
       if (result != null && mounted) context.go('/home');
     } catch (e) {
-      setState(() {
-        _errorMessage = 'Google sign in failed. Please try again.';
-      });
+      setState(() { _errorMessage = 'Google sign in failed. Please try again.'; });
     } finally {
       if (mounted) setState(() => _isLoading = false);
     }
@@ -84,42 +70,33 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
               crossAxisAlignment: CrossAxisAlignment.stretch,
               children: [
                 const SizedBox(height: 48),
-                Icon(
-                  Icons.restaurant_menu,
-                  size: 64,
-                  color: colorScheme.primary,
-                ),
+                Icon(Icons.restaurant_menu, size: 64, color: colorScheme.primary),
                 const SizedBox(height: 16),
                 Text(
                   'Global Culinary Hub',
                   textAlign: TextAlign.center,
                   style: Theme.of(context).textTheme.headlineMedium?.copyWith(
-                        fontWeight: FontWeight.bold,
-                        color: colorScheme.primary,
-                      ),
+                    fontWeight: FontWeight.bold,
+                    color: colorScheme.primary,
+                  ),
                 ),
                 const SizedBox(height: 8),
                 Text(
                   'Sign in to explore world cuisine',
                   textAlign: TextAlign.center,
-                  style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                        color: Colors.grey,
-                      ),
+                  style: Theme.of(context).textTheme.bodyMedium?.copyWith(color: Colors.grey),
                 ),
                 const SizedBox(height: 40),
                 if (_errorMessage != null)
                   Container(
                     padding: const EdgeInsets.all(12),
+                    margin: const EdgeInsets.only(bottom: 16),
                     decoration: BoxDecoration(
                       color: colorScheme.errorContainer,
                       borderRadius: BorderRadius.circular(12),
                     ),
-                    child: Text(
-                      _errorMessage!,
-                      style: TextStyle(color: colorScheme.error),
-                    ),
+                    child: Text(_errorMessage!, style: TextStyle(color: colorScheme.error)),
                   ),
-                if (_errorMessage != null) const SizedBox(height: 16),
                 TextFormField(
                   controller: _emailController,
                   keyboardType: TextInputType.emailAddress,
@@ -140,8 +117,7 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                       icon: Icon(_obscurePassword
                           ? Icons.visibility_outlined
                           : Icons.visibility_off_outlined),
-                      onPressed: () => setState(
-                          () => _obscurePassword = !_obscurePassword),
+                      onPressed: () => setState(() => _obscurePassword = !_obscurePassword),
                     ),
                   ),
                   validator: Validators.validatePassword,
@@ -158,28 +134,19 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                 ElevatedButton(
                   onPressed: _isLoading ? null : _signIn,
                   child: _isLoading
-                      ? const SizedBox(
-                          height: 20,
-                          width: 20,
-                          child: CircularProgressIndicator(
-                            strokeWidth: 2,
-                            color: Colors.white,
-                          ),
-                        )
+                      ? const SizedBox(height: 20, width: 20,
+                          child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white))
                       : const Text('Sign In'),
                 ),
                 const SizedBox(height: 16),
-                Row(
-                  children: [
-                    const Expanded(child: Divider()),
-                    Padding(
-                      padding: const EdgeInsets.symmetric(horizontal: 16),
-                      child: Text('or',
-                          style: TextStyle(color: Colors.grey.shade500)),
-                    ),
-                    const Expanded(child: Divider()),
-                  ],
-                ),
+                Row(children: [
+                  const Expanded(child: Divider()),
+                  Padding(
+                    padding: const EdgeInsets.symmetric(horizontal: 16),
+                    child: Text('or', style: TextStyle(color: Colors.grey.shade500)),
+                  ),
+                  const Expanded(child: Divider()),
+                ]),
                 const SizedBox(height: 16),
                 OutlinedButton.icon(
                   onPressed: _isLoading ? null : _signInWithGoogle,
@@ -220,15 +187,10 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
         content: TextField(
           controller: controller,
           keyboardType: TextInputType.emailAddress,
-          decoration: const InputDecoration(
-            labelText: 'Enter your email',
-          ),
+          decoration: const InputDecoration(labelText: 'Enter your email'),
         ),
         actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(ctx),
-            child: const Text('Cancel'),
-          ),
+          TextButton(onPressed: () => Navigator.pop(ctx), child: const Text('Cancel')),
           ElevatedButton(
             onPressed: () async {
               try {
@@ -237,8 +199,7 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                 if (ctx.mounted) {
                   Navigator.pop(ctx);
                   ScaffoldMessenger.of(context).showSnackBar(
-                    const SnackBar(
-                        content: Text('Password reset email sent')),
+                    const SnackBar(content: Text('Password reset email sent')),
                   );
                 }
               } catch (e) {
