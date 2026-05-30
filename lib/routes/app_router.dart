@@ -13,6 +13,7 @@ import '../screens/favorites/favorites_screen.dart';
 import '../screens/history/history_screen.dart';
 import '../screens/chat/ai_chat_screen.dart';
 import '../screens/dashboard/monitoring_dashboard.dart';
+import '../screens/cuisine/cuisine_dishes_screen.dart';
 import '../providers/auth_provider.dart';
 
 final appRouterProvider = Provider<GoRouter>((ref) {
@@ -87,6 +88,12 @@ final appRouterProvider = Provider<GoRouter>((ref) {
           GoRoute(
             path: '/dashboard',
             builder: (context, state) => const MonitoringDashboard(),
+          ),
+          GoRoute(
+            path: '/cuisine/:name',
+            builder: (context, state) => CuisineDishesScreen(
+              cuisineName: state.pathParameters['name'] ?? '',
+            ),
           ),
         ],
       ),
