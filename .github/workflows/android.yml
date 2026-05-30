@@ -74,10 +74,64 @@ jobs:
 
           chmod +x android/gradlew
 
-          echo "=== gradle-wrapper.properties ==="
-          cat android/gradle/wrapper/gradle-wrapper.properties
-          echo "=== gradle.properties ==="
-          cat android/gradle.properties
+      - name: Create Android Resources
+        run: |
+          mkdir -p android/app/src/main/res/values
+
+          cat > android/app/src/main/res/values/styles.xml << 'EOF'
+          <?xml version="1.0" encoding="utf-8"?>
+          <resources>
+              <style name="LaunchTheme" parent="@android:style/Theme.Black.NoTitleBar">
+                  <item name="android:windowBackground">@android:color/white</item>
+              </style>
+              <style name="NormalTheme" parent="@android:style/Theme.Black.NoTitleBar">
+                  <item name="android:windowBackground">@android:color/white</item>
+              </style>
+          </resources>
+          EOF
+
+          sudo apt-get install -y imagemagick 2>/dev/null || true
+
+          for density in mdpi hdpi xhdpi xxhdpi xxxhdpi; do
+            case $density in
+              mdpi) size=48 ;;
+              hdpi) size=72 ;;
+              xhdpi) size=96 ;;
+              xxhdpi) size=144 ;;
+              xxxhdpi) size=192 ;;
+            esac
+            mkdir -p android/app/src/main/res/mipmap-$density
+            convert -size ${size}x${size} xc:"#FF6B35" \
+              -fill white -draw "circle $((size/2)),$((size/2)) $((size/2)),2" \
+              android/app/src/main/res/mipmap-$density/ic_launcher.png 2>/dev/null || \
+            convert -size ${size}x${size} xc:"#FF6B35" \
+              android/app/src/main/res/mipmap-$density/ic_launcher.png 2>/dev/null || \
+            python3 << PYEOF
+          import struct, zlib
+          size = $size
+          def make_png(w, h, color):
+              def chunk(t, d):
+                  import struct, zlib
+                  c = t + d
+                  return struct.pack('>I', len(d)) + c + struct.pack('>I', zlib.crc32(c) & 0xffffffff)
+              sig = b'\x89PNG\r\n\x1a\n'
+              ihdr = chunk(b'IHDR', struct.pack('>IIBBBBB', w, h, 8, 2, 0, 0, 0))
+              row = b'\x00' + bytes(color) * w
+              raw = row * h
+              idat = chunk(b'IDAT', zlib.compress(raw, 9))
+              iend = chunk(b'IEND', b'')
+              return sig + ihdr + idat + iend
+          data = make_png(size, size, [255, 107, 53])
+          with open('android/app/src/main/res/mipmap-$density/ic_launcher.png', 'wb') as f:
+              f.write(data)
+          PYEOF
+          done
+
+          echo "Verifying icons:"
+          for density in mdpi hdpi xhdpi xxhdpi xxxhdpi; do
+            echo -n "mipmap-$density/ic_launcher.png: "
+            file android/app/src/main/res/mipmap-$density/ic_launcher.png
+          done
 
       - name: Accept Android Licenses
         run: yes | sdkmanager --licenses || true
