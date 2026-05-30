@@ -54,17 +54,24 @@ jobs:
       - name: Run Tests
         run: flutter test
 
-      - name: Setup Android SDK
+      - name: Fix Gradle Wrapper
         run: |
-          echo "ANDROID_SDK_ROOT=$ANDROID_SDK_ROOT" >> $GITHUB_ENV
-          yes | sdkmanager --licenses || true
+          mkdir -p android/gradle/wrapper
+          cat > android/gradle/wrapper/gradle-wrapper.properties << 'EOF'
+          distributionBase=GRADLE_USER_HOME
+          distributionPath=wrapper/dists
+          distributionUrl=https\://services.gradle.org/distributions/gradle-8.3-all.zip
+          zipStoreBase=GRADLE_USER_HOME
+          zipStorePath=wrapper/dists
+          EOF
+          chmod +x android/gradlew || true
+          ls -la android/
+
+      - name: Accept Android Licenses
+        run: yes | sdkmanager --licenses || true
 
       - name: Build Release APK
-        run: |
-          cd android
-          chmod +x gradlew
-          cd ..
-          flutter build apk --release --no-tree-shake-icons
+        run: flutter build apk --release --no-tree-shake-icons
 
       - name: Build Release AAB
         run: flutter build appbundle --release --no-tree-shake-icons
