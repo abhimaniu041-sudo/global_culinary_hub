@@ -299,7 +299,7 @@ class _CuisineChip extends StatelessWidget {
       margin: const EdgeInsets.only(right: 12),
       child: InkWell(
         borderRadius: BorderRadius.circular(12),
-        onTap: () => context.go('/search?q=$name cuisine'),
+        onTap: () => context.go('/generate?q=$name cuisine'),
         child: Container(
           padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
           decoration: BoxDecoration(
