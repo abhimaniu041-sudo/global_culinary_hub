@@ -1,7 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
-import '../../providers/recipe_provider.dart';
 import '../../services/recipe_service.dart';
 import '../../models/recipe_model.dart';
 import '../../widgets/recipe_card.dart';
@@ -11,8 +10,7 @@ class RecipeSearchScreen extends ConsumerStatefulWidget {
   const RecipeSearchScreen({super.key});
 
   @override
-  ConsumerState<RecipeSearchScreen> createState() =>
-      _RecipeSearchScreenState();
+  ConsumerState<RecipeSearchScreen> createState() => _RecipeSearchScreenState();
 }
 
 class _RecipeSearchScreenState extends ConsumerState<RecipeSearchScreen> {
@@ -29,12 +27,7 @@ class _RecipeSearchScreenState extends ConsumerState<RecipeSearchScreen> {
 
   Future<void> _search(String query) async {
     if (query.trim().isEmpty) return;
-
-    setState(() {
-      _isLoading = true;
-      _hasSearched = true;
-    });
-
+    setState(() { _isLoading = true; _hasSearched = true; });
     try {
       final recipeService = ref.read(recipeServiceProvider);
       final results = await recipeService.searchRecipes(query);
@@ -62,10 +55,7 @@ class _RecipeSearchScreenState extends ConsumerState<RecipeSearchScreen> {
                   icon: const Icon(Icons.clear),
                   onPressed: () {
                     _searchController.clear();
-                    setState(() {
-                      _results = [];
-                      _hasSearched = false;
-                    });
+                    setState(() { _results = []; _hasSearched = false; });
                   },
                 ),
             ],
@@ -76,17 +66,14 @@ class _RecipeSearchScreenState extends ConsumerState<RecipeSearchScreen> {
           ElevatedButton.icon(
             onPressed: () {
               if (_searchController.text.trim().isNotEmpty) {
-                context.go(
-                    '/generate?q=${Uri.encodeComponent(_searchController.text.trim())}');
+                context.go('/generate?q=${Uri.encodeComponent(_searchController.text.trim())}');
               }
             },
             icon: const Icon(Icons.auto_awesome, size: 16),
             label: const Text('Generate with AI'),
           ),
           const SizedBox(height: 16),
-          Expanded(
-            child: _buildResults(),
-          ),
+          Expanded(child: _buildResults()),
         ],
       ),
     );
@@ -94,7 +81,6 @@ class _RecipeSearchScreenState extends ConsumerState<RecipeSearchScreen> {
 
   Widget _buildResults() {
     if (_isLoading) return const LoadingWidget();
-
     if (!_hasSearched) {
       return const Center(
         child: Column(
@@ -108,7 +94,6 @@ class _RecipeSearchScreenState extends ConsumerState<RecipeSearchScreen> {
         ),
       );
     }
-
     if (_results.isEmpty) {
       return Center(
         child: Column(
@@ -128,7 +113,6 @@ class _RecipeSearchScreenState extends ConsumerState<RecipeSearchScreen> {
         ),
       );
     }
-
     return ListView.builder(
       itemCount: _results.length,
       itemBuilder: (context, index) {
