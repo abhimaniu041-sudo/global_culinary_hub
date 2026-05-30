@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
+import 'package:cached_network_image/cached_network_image.dart';
 import '../screens/splash_screen.dart';
 import '../screens/auth/login_screen.dart';
 import '../screens/auth/register_screen.dart';
@@ -8,12 +9,14 @@ import '../screens/home/home_screen.dart';
 import '../screens/recipe/recipe_search_screen.dart';
 import '../screens/recipe/recipe_detail_screen.dart';
 import '../screens/recipe/recipe_generate_screen.dart';
+import '../screens/recipe/recipe_detail_direct_screen.dart';
 import '../screens/camera/camera_screen.dart';
 import '../screens/favorites/favorites_screen.dart';
 import '../screens/history/history_screen.dart';
 import '../screens/chat/ai_chat_screen.dart';
 import '../screens/dashboard/monitoring_dashboard.dart';
 import '../providers/auth_provider.dart';
+import '../services/cuisine_service.dart';
 
 final appRouterProvider = Provider<GoRouter>((ref) {
   final authState = ref.watch(authStateProvider);
@@ -25,75 +28,43 @@ final appRouterProvider = Provider<GoRouter>((ref) {
       final isAuthRoute = state.matchedLocation == '/login' ||
           state.matchedLocation == '/register' ||
           state.matchedLocation == '/splash';
-
-      if (!isAuthenticated && !isAuthRoute) {
-        return '/login';
-      }
-      if (isAuthenticated && state.matchedLocation == '/login') {
-        return '/home';
-      }
+      if (!isAuthenticated && !isAuthRoute) return '/login';
+      if (isAuthenticated && state.matchedLocation == '/login') return '/home';
       return null;
     },
     routes: [
-      GoRoute(
-        path: '/splash',
-        builder: (context, state) => const SplashScreen(),
-      ),
-      GoRoute(
-        path: '/login',
-        builder: (context, state) => const LoginScreen(),
-      ),
-      GoRoute(
-        path: '/register',
-        builder: (context, state) => const RegisterScreen(),
-      ),
+      GoRoute(path: '/splash', builder: (c, s) => const SplashScreen()),
+      GoRoute(path: '/login', builder: (c, s) => const LoginScreen()),
+      GoRoute(path: '/register', builder: (c, s) => const RegisterScreen()),
       ShellRoute(
         builder: (context, state, child) => HomeScreen(child: child),
         routes: [
-          GoRoute(
-            path: '/home',
-            builder: (context, state) => const HomeContent(),
-          ),
-          GoRoute(
-            path: '/search',
-            builder: (context, state) => const RecipeSearchScreen(),
-          ),
+          GoRoute(path: '/home', builder: (c, s) => const HomeContent()),
+          GoRoute(path: '/search', builder: (c, s) => const RecipeSearchScreen()),
           GoRoute(
             path: '/recipe/:id',
-            builder: (context, state) => RecipeDetailScreen(
-              recipeId: state.pathParameters['id'] ?? '',
+            builder: (c, s) => RecipeDetailScreen(
+              recipeId: s.pathParameters['id'] ?? '',
+            ),
+          ),
+          GoRoute(path: '/generate', builder: (c, s) => const RecipeGenerateScreen()),
+          GoRoute(path: '/camera', builder: (c, s) => const CameraScreen()),
+          GoRoute(path: '/favorites', builder: (c, s) => const FavoritesScreen()),
+          GoRoute(path: '/history', builder: (c, s) => const HistoryScreen()),
+          GoRoute(path: '/chat', builder: (c, s) => const AiChatScreen()),
+          GoRoute(path: '/dashboard', builder: (c, s) => const MonitoringDashboard()),
+          GoRoute(
+            path: '/cuisine/:name',
+            builder: (c, s) => _CuisineScreen(
+              cuisineName: s.pathParameters['name'] ?? '',
             ),
           ),
           GoRoute(
-            path: '/generate',
-            builder: (context, state) => const RecipeGenerateScreen(),
-          ),
-          GoRoute(
-            path: '/camera',
-            builder: (context, state) => const CameraScreen(),
-          ),
-          GoRoute(
-            path: '/favorites',
-            builder: (context, state) => const FavoritesScreen(),
-          ),
-          GoRoute(
-            path: '/history',
-            builder: (context, state) => const HistoryScreen(),
-          ),
-          GoRoute(
-            path: '/chat',
-            builder: (context, state) => const AiChatScreen(),
-          ),
-          GoRoute(
-            path: '/dashboard',
-            builder: (context, state) => const MonitoringDashboard(),
-          ),
-          GoRoute(
-            path: '/cuisine/:name',
-            builder: (context, state) {
-              final name = state.pathParameters['name'] ?? '';
-              return _CuisineSearchScreen(cuisineName: name);
-            },
+            path: '/dish',
+            builder: (c, s) => RecipeDetailDirectScreen(
+              dishName: s.uri.queryParameters['name'] ?? '',
+              imageUrl: s.uri.queryParameters['img'],
+            ),
           ),
         ],
       ),
@@ -101,120 +72,250 @@ final appRouterProvider = Provider<GoRouter>((ref) {
   );
 });
 
-class _CuisineSearchScreen extends ConsumerWidget {
+// ─── Cuisine Screen ────────────────────────────────────────────────────────
+final _cuisinePageProvider =
+    StateProvider.family<int, String>((ref, cuisine) => 0);
+
+final _cuisineDishesProvider =
+    FutureProvider.family<List<CuisineDish>, String>((ref, key) async {
+  final parts = key.split('::');
+  final cuisine = parts[0];
+  final page = int.tryParse(parts.length > 1 ? parts[1] : '0') ?? 0;
+  final service = ref.read(cuisineServiceProvider);
+  return service.getCuisineDishes(cuisine, page: page);
+});
+
+class _CuisineScreen extends ConsumerStatefulWidget {
   final String cuisineName;
-  const _CuisineSearchScreen({required this.cuisineName});
+  const _CuisineScreen({required this.cuisineName});
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
+  ConsumerState<_CuisineScreen> createState() => _CuisineScreenState();
+}
+
+class _CuisineScreenState extends ConsumerState<_CuisineScreen> {
+  int _page = 0;
+  final List<CuisineDish> _allDishes = [];
+  bool _isLoadingMore = false;
+  final ScrollController _scrollController = ScrollController();
+
+  @override
+  void initState() {
+    super.initState();
+    _scrollController.addListener(_onScroll);
+  }
+
+  @override
+  void dispose() {
+    _scrollController.dispose();
+    super.dispose();
+  }
+
+  void _onScroll() {
+    if (_scrollController.position.pixels >=
+            _scrollController.position.maxScrollExtent - 300 &&
+        !_isLoadingMore) {
+      _loadMore();
+    }
+  }
+
+  Future<void> _loadMore() async {
+    if (_isLoadingMore) return;
+    setState(() => _isLoadingMore = true);
+    _page++;
+    final service = ref.read(cuisineServiceProvider);
+    final more =
+        await service.getCuisineDishes(widget.cuisineName, page: _page);
+    setState(() {
+      _allDishes.addAll(more);
+      _isLoadingMore = false;
+    });
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final key = '${widget.cuisineName}::0';
+    final dishesAsync = ref.watch(_cuisineDishesProvider(key));
+
     return Scaffold(
-      appBar: AppBar(title: Text('$cuisineName Cuisine')),
-      body: Padding(
-        padding: const EdgeInsets.all(16),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.stretch,
-          children: [
-            Text(
-              'Popular $cuisineName Dishes',
-              style: Theme.of(context)
-                  .textTheme
-                  .headlineSmall
-                  ?.copyWith(fontWeight: FontWeight.bold),
-            ),
-            const SizedBox(height: 8),
-            Text(
-              'Tap any dish to generate its complete recipe with AI',
-              style: const TextStyle(color: Colors.grey),
-            ),
-            const SizedBox(height: 20),
-            Expanded(
-              child: _CuisineDishList(cuisineName: cuisineName),
-            ),
-          ],
+      appBar: AppBar(
+        title: Text('${widget.cuisineName} Cuisine'),
+        actions: [
+          IconButton(
+            icon: const Icon(Icons.refresh),
+            onPressed: () {
+              _allDishes.clear();
+              _page = 0;
+              ref.invalidate(_cuisineDishesProvider(key));
+            },
+          ),
+        ],
+      ),
+      body: dishesAsync.when(
+        data: (dishes) {
+          if (_allDishes.isEmpty) _allDishes.addAll(dishes);
+          return Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Padding(
+                padding: const EdgeInsets.fromLTRB(16, 12, 16, 4),
+                child: Text(
+                  '${_allDishes.length}+ dishes loaded',
+                  style: const TextStyle(color: Colors.grey, fontSize: 12),
+                ),
+              ),
+              Expanded(
+                child: ListView.builder(
+                  controller: _scrollController,
+                  padding: const EdgeInsets.all(12),
+                  itemCount: _allDishes.length + (_isLoadingMore ? 1 : 0),
+                  itemBuilder: (context, index) {
+                    if (index == _allDishes.length) {
+                      return const Padding(
+                        padding: EdgeInsets.all(16),
+                        child: Center(child: CircularProgressIndicator()),
+                      );
+                    }
+                    return _DishTile(
+                      dish: _allDishes[index],
+                      index: index,
+                    );
+                  },
+                ),
+              ),
+            ],
+          );
+        },
+        loading: () => const Center(
+          child: Column(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              CircularProgressIndicator(),
+              SizedBox(height: 16),
+              Text('AI is loading dishes...'),
+            ],
+          ),
+        ),
+        error: (e, _) => Center(
+          child: ElevatedButton(
+            onPressed: () => ref.invalidate(_cuisineDishesProvider(key)),
+            child: const Text('Retry'),
+          ),
         ),
       ),
     );
   }
 }
 
-final _dishListProvider =
-    FutureProvider.family<List<String>, String>((ref, cuisine) async {
-  final orchestrator = ref.read(
-      Provider((r) => r.read(
-          Provider((r2) => null))));
-  return _getDefaultDishes(cuisine);
-});
-
-List<String> _getDefaultDishes(String cuisine) {
-  final dishes = {
-    'Italian': ['Pizza Margherita', 'Pasta Carbonara', 'Lasagna', 'Risotto', 'Tiramisu', 'Osso Buco', 'Bruschetta', 'Minestrone', 'Gnocchi', 'Panna Cotta', 'Arancini', 'Cannoli'],
-    'Indian': ['Butter Chicken', 'Biryani', 'Dal Makhani', 'Palak Paneer', 'Chole Bhature', 'Samosa', 'Naan', 'Tandoori Chicken', 'Gulab Jamun', 'Dosa', 'Pav Bhaji', 'Rogan Josh'],
-    'Mexican': ['Tacos', 'Enchiladas', 'Guacamole', 'Tamales', 'Chiles Rellenos', 'Pozole', 'Mole Poblano', 'Quesadilla', 'Burrito', 'Churros', 'Elote', 'Horchata'],
-    'Japanese': ['Sushi', 'Ramen', 'Tempura', 'Tonkatsu', 'Miso Soup', 'Yakitori', 'Gyoza', 'Udon', 'Takoyaki', 'Matcha Ice Cream', 'Onigiri', 'Teriyaki'],
-    'Chinese': ['Kung Pao Chicken', 'Dim Sum', 'Peking Duck', 'Fried Rice', 'Hot Pot', 'Mapo Tofu', 'Spring Rolls', 'Wonton Soup', 'Char Siu', 'Xiaolongbao', 'Congee', 'Chow Mein'],
-    'French': ['Croissant', 'Coq au Vin', 'Ratatouille', 'Bouillabaisse', 'Crème Brûlée', 'Quiche Lorraine', 'Escargot', 'Soufflé', 'Beef Bourguignon', 'Crepes', 'French Onion Soup', 'Macarons'],
-    'Thai': ['Pad Thai', 'Tom Yum', 'Green Curry', 'Som Tum', 'Massaman Curry', 'Khao Pad', 'Mango Sticky Rice', 'Tom Kha Gai', 'Larb', 'Pad See Ew', 'Thai Spring Rolls', 'Satay'],
-    'American': ['Burger', 'BBQ Ribs', 'Mac and Cheese', 'Clam Chowder', 'Buffalo Wings', 'Apple Pie', 'Pancakes', 'Lobster Roll', 'Cheesesteak', 'Gumbo', 'Cornbread', 'Key Lime Pie'],
-  };
-  return dishes[cuisine] ?? List.generate(12, (i) => '$cuisine Dish ${i + 1}');
-}
-
-class _CuisineDishList extends ConsumerWidget {
-  final String cuisineName;
-  const _CuisineDishList({required this.cuisineName});
+class _DishTile extends StatelessWidget {
+  final CuisineDish dish;
+  final int index;
+  const _DishTile({required this.dish, required this.index});
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
-    final dishes = _getDefaultDishes(cuisineName);
+  Widget build(BuildContext context) {
     final colorScheme = Theme.of(context).colorScheme;
 
-    return ListView.builder(
-      itemCount: dishes.length,
-      itemBuilder: (context, index) {
-        final dish = dishes[index];
-        return Card(
-          margin: const EdgeInsets.only(bottom: 10),
-          child: ListTile(
-            leading: Container(
-              width: 36,
-              height: 36,
-              decoration: BoxDecoration(
-                color: colorScheme.primaryContainer,
-                borderRadius: BorderRadius.circular(8),
+    return Card(
+      margin: const EdgeInsets.only(bottom: 10),
+      child: InkWell(
+        borderRadius: BorderRadius.circular(16),
+        onTap: () => context.go(
+          '/dish?name=${Uri.encodeComponent(dish.name)}&img=${Uri.encodeComponent(dish.imageUrl)}',
+        ),
+        child: Row(
+          children: [
+            ClipRRect(
+              borderRadius: const BorderRadius.only(
+                topLeft: Radius.circular(16),
+                bottomLeft: Radius.circular(16),
               ),
-              child: Center(
-                child: Text(
-                  '${index + 1}',
-                  style: TextStyle(
-                    fontWeight: FontWeight.bold,
-                    color: colorScheme.primary,
-                  ),
+              child: CachedNetworkImage(
+                imageUrl: dish.imageUrl,
+                width: 90,
+                height: 90,
+                fit: BoxFit.cover,
+                placeholder: (ctx, url) => Container(
+                  width: 90,
+                  height: 90,
+                  color: colorScheme.primaryContainer,
+                  child: Icon(Icons.restaurant,
+                      color: colorScheme.primary),
+                ),
+                errorWidget: (ctx, url, err) => Container(
+                  width: 90,
+                  height: 90,
+                  color: colorScheme.primaryContainer,
+                  child: Icon(Icons.restaurant,
+                      color: colorScheme.primary),
                 ),
               ),
             ),
-            title: Text(
-              dish,
-              style: const TextStyle(fontWeight: FontWeight.w600),
-            ),
-            subtitle: Text(
-              '$cuisineName cuisine',
-              style: const TextStyle(fontSize: 12),
-            ),
-            trailing: ElevatedButton.icon(
-              onPressed: () => context.go(
-                  '/generate?q=${Uri.encodeComponent(dish)}'),
-              icon: const Icon(Icons.auto_awesome, size: 14),
-              label: const Text('Recipe', style: TextStyle(fontSize: 12)),
-              style: ElevatedButton.styleFrom(
-                padding: const EdgeInsets.symmetric(
-                    horizontal: 10, vertical: 6),
+            Expanded(
+              child: Padding(
+                padding: const EdgeInsets.all(12),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      dish.name,
+                      style: const TextStyle(
+                          fontWeight: FontWeight.bold, fontSize: 15),
+                    ),
+                    if (dish.originalName.isNotEmpty &&
+                        dish.originalName != dish.name)
+                      Text(
+                        dish.originalName,
+                        style: TextStyle(
+                          fontSize: 11,
+                          color: colorScheme.primary,
+                          fontStyle: FontStyle.italic,
+                        ),
+                      ),
+                    const SizedBox(height: 4),
+                    Text(
+                      dish.description,
+                      style: const TextStyle(
+                          fontSize: 12, color: Colors.grey),
+                      maxLines: 2,
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                    const SizedBox(height: 6),
+                    Row(
+                      children: [
+                        const Icon(Icons.timer_outlined,
+                            size: 12, color: Colors.grey),
+                        const SizedBox(width: 3),
+                        Text(dish.prepTime,
+                            style: const TextStyle(
+                                fontSize: 11, color: Colors.grey)),
+                        const SizedBox(width: 8),
+                        Container(
+                          padding: const EdgeInsets.symmetric(
+                              horizontal: 6, vertical: 2),
+                          decoration: BoxDecoration(
+                            color: Colors.orange.withOpacity(0.15),
+                            borderRadius: BorderRadius.circular(4),
+                          ),
+                          child: Text(
+                            dish.difficulty,
+                            style: const TextStyle(
+                                fontSize: 10, color: Colors.orange),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ],
+                ),
               ),
             ),
-            onTap: () => context.go(
-                '/generate?q=${Uri.encodeComponent(dish)}'),
-          ),
-        );
-      },
+            const Padding(
+              padding: EdgeInsets.only(right: 8),
+              child: Icon(Icons.arrow_forward_ios, size: 14),
+            ),
+          ],
+        ),
+      ),
     );
   }
 }
