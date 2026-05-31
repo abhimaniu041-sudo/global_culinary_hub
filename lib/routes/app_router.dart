@@ -16,6 +16,7 @@ import '../screens/history/history_screen.dart';
 import '../screens/chat/ai_chat_screen.dart';
 import '../screens/dashboard/monitoring_dashboard.dart';
 import '../providers/auth_provider.dart';
+import '../screens/profile/profile_screen.dart';
 
 final appRouterProvider = Provider<GoRouter>((ref) {
   final authState = ref.watch(authStateProvider);
@@ -49,6 +50,10 @@ final appRouterProvider = Provider<GoRouter>((ref) {
           GoRoute(path: '/history', builder: (c, s) => const HistoryScreen()),
           GoRoute(path: '/chat', builder: (c, s) => const AiChatScreen()),
           GoRoute(path: '/dashboard', builder: (c, s) => const MonitoringDashboard()),
+          GoRoute(
+            path: '/profile',
+            builder: (c, s) => const ProfileScreen(),
+          ),
           GoRoute(
             path: '/cuisine/:name',
             builder: (c, s) => CuisineScreen(cuisineName: s.pathParameters['name'] ?? ''),
