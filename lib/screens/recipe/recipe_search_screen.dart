@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
-import '../../services/recipe_service.dart';
+import '../../ai/ai_orchestrator.dart';
 import '../../models/recipe_model.dart';
 import '../../widgets/recipe_card.dart';
 import '../../widgets/loading_widget.dart';
@@ -10,7 +10,8 @@ class RecipeSearchScreen extends ConsumerStatefulWidget {
   const RecipeSearchScreen({super.key});
 
   @override
-  ConsumerState<RecipeSearchScreen> createState() => _RecipeSearchScreenState();
+  ConsumerState<RecipeSearchScreen> createState() =>
+      _RecipeSearchScreenState();
 }
 
 class _RecipeSearchScreenState extends ConsumerState<RecipeSearchScreen> {
@@ -27,15 +28,43 @@ class _RecipeSearchScreenState extends ConsumerState<RecipeSearchScreen> {
 
   Future<void> _search(String query) async {
     if (query.trim().isEmpty) return;
-    setState(() { _isLoading = true; _hasSearched = true; });
+    setState(() {
+      _isLoading = true;
+      _hasSearched = true;
+      _results = [];
+    });
     try {
-      final recipeService = ref.read(recipeServiceProvider);
-      final results = await recipeService.searchRecipes(query);
-      setState(() => _results = results);
+      final orchestrator = ref.read(aiOrchestratorProvider);
+      final prompt = '''
+List 8 dishes matching "$query". Respond ONLY with valid JSON array:
+[{"recipe_id":"id1","name":"Dish Name","cuisine":"Italian","history":"brief history","ingredients":["ing1","ing2"],"instructions":["Step 1","Step 2"],"prep_time":"30 min","difficulty":"Easy","servings":"4","suggested_substitutions":["sub1"],"nutrition":{"calories":"300 kcal","protein":"20g","carbs":"30g","fat":"10g"}}]
+No text outside JSON.
+''';
+      final response = await orchestrator.generateText(prompt);
+      final start = response.indexOf('[');
+      final end = response.lastIndexOf(']');
+      if (start >= 0 && end > start) {
+        final jsonStr = response.substring(start, end + 1);
+        final list = _parseJsonList(jsonStr);
+        setState(() {
+          _results = list
+              .map((e) => RecipeModel.fromJson(e as Map<String, dynamic>))
+              .toList();
+        });
+      }
     } catch (e) {
       setState(() => _results = []);
     } finally {
-      setState(() => _isLoading = false);
+      if (mounted) setState(() => _isLoading = false);
+    }
+  }
+
+  List<dynamic> _parseJsonList(String jsonStr) {
+    try {
+      import 'dart:convert';
+      return jsonDecode(jsonStr) as List;
+    } catch (e) {
+      return [];
     }
   }
 
@@ -55,7 +84,10 @@ class _RecipeSearchScreenState extends ConsumerState<RecipeSearchScreen> {
                   icon: const Icon(Icons.clear),
                   onPressed: () {
                     _searchController.clear();
-                    setState(() { _results = []; _hasSearched = false; });
+                    setState(() {
+                      _results = [];
+                      _hasSearched = false;
+                    });
                   },
                 ),
             ],
@@ -66,7 +98,8 @@ class _RecipeSearchScreenState extends ConsumerState<RecipeSearchScreen> {
           ElevatedButton.icon(
             onPressed: () {
               if (_searchController.text.trim().isNotEmpty) {
-                context.go('/generate?q=${Uri.encodeComponent(_searchController.text.trim())}');
+                context.go(
+                    '/generate?q=${Uri.encodeComponent(_searchController.text.trim())}');
               }
             },
             icon: const Icon(Icons.auto_awesome, size: 16),
@@ -80,7 +113,9 @@ class _RecipeSearchScreenState extends ConsumerState<RecipeSearchScreen> {
   }
 
   Widget _buildResults() {
-    if (_isLoading) return const LoadingWidget();
+    if (_isLoading) {
+      return const LoadingWidget(message: 'AI is searching recipes...');
+    }
     if (!_hasSearched) {
       return const Center(
         child: Column(
@@ -101,7 +136,7 @@ class _RecipeSearchScreenState extends ConsumerState<RecipeSearchScreen> {
           children: [
             const Icon(Icons.no_meals, size: 64, color: Colors.grey),
             const SizedBox(height: 16),
-            const Text('No recipes found'),
+            const Text('No results. Try AI Generate:'),
             const SizedBox(height: 8),
             ElevatedButton.icon(
               onPressed: () => context.go(
@@ -119,7 +154,10 @@ class _RecipeSearchScreenState extends ConsumerState<RecipeSearchScreen> {
         final recipe = _results[index];
         return RecipeCard(
           recipe: recipe,
-          onTap: () => context.go('/recipe/${recipe.recipeId}'),
+          onTap: () {
+            context.go(
+                '/dish?name=${Uri.encodeComponent(recipe.name)}&img=');
+          },
         );
       },
     );
