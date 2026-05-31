@@ -6,7 +6,6 @@ class ChatMessage {
   final String content;
   final bool isUser;
   final DateTime timestamp;
-
   ChatMessage({
     required this.content,
     required this.isUser,
@@ -32,7 +31,7 @@ class _AiChatScreenState extends ConsumerState<AiChatScreen> {
     super.initState();
     _messages.add(ChatMessage(
       content:
-          'Hello! I am your AI Chef assistant. Ask me anything about cooking, recipes, ingredients, techniques, or world cuisines. I am here to help you create amazing dishes!',
+          'Hello! I am your AI Chef assistant. Ask me anything about cooking, recipes, ingredients, techniques, or world cuisines.',
       isUser: false,
       timestamp: DateTime.now(),
     ));
@@ -48,30 +47,17 @@ class _AiChatScreenState extends ConsumerState<AiChatScreen> {
   Future<void> _sendMessage() async {
     final text = _messageController.text.trim();
     if (text.isEmpty || _isLoading) return;
-
     _messageController.clear();
     setState(() {
-      _messages.add(ChatMessage(
-        content: text,
-        isUser: true,
-        timestamp: DateTime.now(),
-      ));
+      _messages.add(ChatMessage(content: text, isUser: true, timestamp: DateTime.now()));
       _isLoading = true;
     });
-
     _scrollToBottom();
-
     try {
       final orchestrator = ref.read(aiOrchestratorProvider);
-      final prompt = '''You are an expert AI Chef assistant for Global Culinary Hub.
-The user asks: "$text"
-
-Provide helpful, accurate culinary advice. Be concise but informative.
-Focus on: recipes, ingredients, cooking techniques, food culture, nutrition, substitutions.
-Keep response under 300 words.''';
-
+      final prompt =
+          'You are an expert AI Chef for Global Culinary Hub. User asks: "$text"\nRespond helpfully about cooking. Keep under 200 words. Use plain text, no markdown symbols like ** or ##.';
       final response = await orchestrator.generateText(prompt);
-
       setState(() {
         _messages.add(ChatMessage(
           content: response,
@@ -83,15 +69,13 @@ Keep response under 300 words.''';
     } catch (e) {
       setState(() {
         _messages.add(ChatMessage(
-          content:
-              'I apologize, but I am currently unavailable. Please try again in a moment.',
+          content: 'I apologize, but I am currently unavailable. Please try again.',
           isUser: false,
           timestamp: DateTime.now(),
         ));
         _isLoading = false;
       });
     }
-
     _scrollToBottom();
   }
 
@@ -110,7 +94,6 @@ Keep response under 300 words.''';
   @override
   Widget build(BuildContext context) {
     final colorScheme = Theme.of(context).colorScheme;
-
     return Column(
       children: [
         Expanded(
@@ -132,10 +115,9 @@ Keep response under 300 words.''';
             color: colorScheme.surface,
             boxShadow: [
               BoxShadow(
-                color: Colors.black.withOpacity(0.05),
-                blurRadius: 10,
-                offset: const Offset(0, -2),
-              ),
+                  color: Colors.black.withOpacity(0.05),
+                  blurRadius: 10,
+                  offset: const Offset(0, -2))
             ],
           ),
           child: Row(
@@ -156,9 +138,7 @@ Keep response under 300 words.''';
               const SizedBox(width: 8),
               FloatingActionButton.small(
                 onPressed: _isLoading ? null : _sendMessage,
-                child: Icon(
-                  _isLoading ? Icons.hourglass_empty : Icons.send,
-                ),
+                child: Icon(_isLoading ? Icons.hourglass_empty : Icons.send),
               ),
             ],
           ),
@@ -176,45 +156,35 @@ class _MessageBubble extends StatelessWidget {
   Widget build(BuildContext context) {
     final colorScheme = Theme.of(context).colorScheme;
     final isUser = message.isUser;
-
     return Padding(
       padding: const EdgeInsets.symmetric(vertical: 6),
       child: Row(
-        mainAxisAlignment:
-            isUser ? MainAxisAlignment.end : MainAxisAlignment.start,
+        mainAxisAlignment: isUser ? MainAxisAlignment.end : MainAxisAlignment.start,
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           if (!isUser) ...[
             CircleAvatar(
               radius: 16,
               backgroundColor: colorScheme.primary,
-              child: const Icon(Icons.restaurant_menu,
-                  size: 16, color: Colors.white),
+              child: const Icon(Icons.restaurant_menu, size: 16, color: Colors.white),
             ),
             const SizedBox(width: 8),
           ],
           Flexible(
             child: Container(
-              padding: const EdgeInsets.symmetric(
-                  horizontal: 16, vertical: 12),
+              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
               decoration: BoxDecoration(
-                color: isUser
-                    ? colorScheme.primary
-                    : colorScheme.surfaceContainerHighest,
+                color: isUser ? colorScheme.primary : colorScheme.surfaceContainerHighest,
                 borderRadius: BorderRadius.only(
                   topLeft: const Radius.circular(16),
                   topRight: const Radius.circular(16),
-                  bottomLeft:
-                      Radius.circular(isUser ? 16 : 4),
-                  bottomRight:
-                      Radius.circular(isUser ? 4 : 16),
+                  bottomLeft: Radius.circular(isUser ? 16 : 4),
+                  bottomRight: Radius.circular(isUser ? 4 : 16),
                 ),
               ),
               child: Text(
                 message.content,
-                style: TextStyle(
-                  color: isUser ? Colors.white : null,
-                ),
+                style: TextStyle(color: isUser ? Colors.white : null),
               ),
             ),
           ),
@@ -223,8 +193,7 @@ class _MessageBubble extends StatelessWidget {
             CircleAvatar(
               radius: 16,
               backgroundColor: colorScheme.secondary,
-              child: const Icon(Icons.person,
-                  size: 16, color: Colors.white),
+              child: const Icon(Icons.person, size: 16, color: Colors.white),
             ),
           ],
         ],
@@ -235,7 +204,6 @@ class _MessageBubble extends StatelessWidget {
 
 class _TypingIndicator extends StatefulWidget {
   const _TypingIndicator();
-
   @override
   State<_TypingIndicator> createState() => _TypingIndicatorState();
 }
@@ -243,7 +211,6 @@ class _TypingIndicator extends StatefulWidget {
 class _TypingIndicatorState extends State<_TypingIndicator>
     with SingleTickerProviderStateMixin {
   late AnimationController _controller;
-
   @override
   void initState() {
     super.initState();
@@ -268,21 +235,17 @@ class _TypingIndicatorState extends State<_TypingIndicator>
           CircleAvatar(
             radius: 16,
             backgroundColor: Theme.of(context).colorScheme.primary,
-            child: const Icon(Icons.restaurant_menu,
-                size: 16, color: Colors.white),
+            child: const Icon(Icons.restaurant_menu, size: 16, color: Colors.white),
           ),
           const SizedBox(width: 8),
-          Container(
-            padding: const EdgeInsets.symmetric(
-                horizontal: 16, vertical: 12),
-            decoration: BoxDecoration(
-              color: Theme.of(context)
-                  .colorScheme
-                  .surfaceContainerHighest,
-              borderRadius: BorderRadius.circular(16),
-            ),
-            child: FadeTransition(
-              opacity: _controller,
+          FadeTransition(
+            opacity: _controller,
+            child: Container(
+              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+              decoration: BoxDecoration(
+                color: Theme.of(context).colorScheme.surfaceContainerHighest,
+                borderRadius: BorderRadius.circular(16),
+              ),
               child: const Text('AI Chef is thinking...'),
             ),
           ),
