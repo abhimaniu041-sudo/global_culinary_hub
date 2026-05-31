@@ -83,6 +83,11 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
             tooltip: 'AI Dashboard',
           ),
           IconButton(
+              icon: const Icon(Icons.person_outline),
+              onPressed: () => context.go('/profile'),
+              tooltip: 'Profile',
+          ),
+          IconButton(
             icon: const Icon(Icons.logout_outlined),
             onPressed: () async {
               final authService = ref.read(authServiceProvider);
