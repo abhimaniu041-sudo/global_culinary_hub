@@ -111,7 +111,6 @@ class CuisineScreen extends StatelessWidget {
           onPressed: () => context.go('/home'),
         ),
         title: Text('$cuisineName Cuisine'),
-        subtitle: Text('${dishes.length} authentic dishes'),
       ),
       body: ListView.builder(
         padding: const EdgeInsets.all(12),
